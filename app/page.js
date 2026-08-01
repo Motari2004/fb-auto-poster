@@ -107,30 +107,32 @@ export default function Home() {
   }, [loadData]);
 
   // Actions
-  const startScheduler = async () => {
-    if (isStarting) return;
-    setIsStarting(true);
-    showToast('🔄 Starting auto-poster...', 'info');
+ const startScheduler = async () => {
+  if (isStarting) return;
+  setIsStarting(true);
+  showToast('🔄 Starting auto-poster...', 'info');
+  
+  try {
+    const res = await fetch('/api/start', { method: 'POST' });
+    const data = await res.json();
     
-    try {
-      const res = await fetch('/api/start', { method: 'POST' });
-      const data = await res.json();
-      
-      if (data.success) {
-        showToast('✅ Auto-poster started!', 'success');
-        await fetchStatus();
-        await fetchQueue();
-        await fetchHistory();
-      } else {
-        showToast('❌ ' + data.error, 'error');
-      }
-    } catch (error) {
-      showToast('Error: ' + error.message, 'error');
-    } finally {
-      setIsStarting(false);
+    if (data.success) {
+      showToast('✅ Auto-poster started!', 'success');
+      // Force refresh status immediately
+      await fetchStatus();
+      await fetchQueue();
+      await fetchHistory();
+      // Also force a re-render by updating a state
+      setStatus(prev => ({ ...prev, running: true }));
+    } else {
+      showToast('❌ ' + data.error, 'error');
     }
-  };
-
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  } finally {
+    setIsStarting(false);
+  }
+};
   const stopScheduler = async () => {
     if (!confirm('Stop the auto-poster?')) return;
     if (isStopping) return;
