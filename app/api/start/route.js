@@ -1,30 +1,38 @@
 import { NextResponse } from 'next/server';
 import { autoPoster } from '../../../lib/scheduler.js';
+import { dbStateManager } from '../../../lib/db-state-manager.js';
 
 export async function POST() {
   try {
-    console.log(`📤 Start API called - Current running: ${autoPoster.running}`);
+    console.log(`📤 Start API called`);
     
     // Initialize if needed
     if (!autoPoster.initialized) {
       await autoPoster.initialize();
     }
     
-    // Start the scheduler (this now requires manual control)
+    // Set running state in database FIRST
+    await dbStateManager.setRunningState(true);
+    console.log('💾 Running state set to TRUE in Neon Database');
+    
+    // Then start the scheduler
     await autoPoster.start();
     
-    console.log(`📤 After start - New running: ${autoPoster.running}`);
+    // Verify state
+    const dbRunning = await dbStateManager.getRunningState();
+    console.log(`📤 After start - DB: ${dbRunning}, Scheduler: ${autoPoster.running}`);
     
     const status = autoPoster.getStatus();
     
     return NextResponse.json({ 
       success: true, 
       message: '✅ Auto-poster started!',
-      running: autoPoster.running,
-      status: status
+      running: dbRunning,
+      status: status,
+      dbState: dbRunning,
     });
   } catch (error) {
-    console.error('Start error:', error);
+    console.error('❌ Start error:', error);
     return NextResponse.json(
       { success: false, error: error.message },
       { status: 500 }
