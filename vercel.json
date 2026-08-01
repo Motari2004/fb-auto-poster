@@ -1,0 +1,22 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".next",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/fetch",
+      "schedule": "0 */2 * * *"
+    }
+  ],
+  "env": {
+    "ZERNIO_API_KEY": "",
+    "FACEBOOK_PAGE_ID": "",
+    "SOCIAL_API_TOKEN": "",
+    "FETCH_INTERVAL_HOURS": "2",
+    "POST_INTERVAL_MINUTES": "15",
+    "MAX_POSTS_PER_FETCH": "9",
+    "QUEUE_MIN_THRESHOLD": "5"
+  }
+}
