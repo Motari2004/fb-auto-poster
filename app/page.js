@@ -27,6 +27,7 @@ export default function Home() {
         throw new Error(`HTTP error! status: ${res.status}`);
       }
       const data = await res.json();
+      console.log('📊 Status fetched:', data.running ? '🟢 Running' : '⏸️ Paused');
       setStatus(data);
       return data;
     } catch (error) {
@@ -40,6 +41,7 @@ export default function Home() {
     try {
       const res = await fetch('/api/queue');
       const data = await res.json();
+      console.log('📋 Queue fetched:', data.queue?.length || 0, 'posts');
       setQueue(data.queue || []);
       return data.queue || [];
     } catch (error) {
@@ -107,60 +109,74 @@ export default function Home() {
   }, [loadData]);
 
   // Actions
- const startScheduler = async () => {
-  if (isStarting) return;
-  setIsStarting(true);
-  showToast('🔄 Starting auto-poster...', 'info');
-  
-  try {
-    const res = await fetch('/api/start', { method: 'POST' });
-    const data = await res.json();
+  const startScheduler = async () => {
+    if (isStarting) return;
+    setIsStarting(true);
+    showToast('🔄 Starting auto-poster...', 'info');
     
-    if (data.success) {
-      showToast('✅ Auto-poster started!', 'success');
-      // Force refresh status immediately
-      await fetchStatus();
-      await fetchQueue();
-      await fetchHistory();
-      // Also force a re-render by updating a state
-      setStatus(prev => ({ ...prev, running: true }));
-    } else {
-      showToast('❌ ' + data.error, 'error');
+    try {
+      const res = await fetch('/api/start', { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.success) {
+        showToast('✅ Auto-poster started!', 'success');
+        // Wait a moment for backend to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Force refresh status
+        await fetchStatus();
+        await fetchQueue();
+        await fetchHistory();
+        // Force update status
+        setStatus(prev => ({ ...prev, running: true }));
+      } else {
+        showToast('❌ ' + data.error, 'error');
+      }
+    } catch (error) {
+      showToast('Error: ' + error.message, 'error');
+    } finally {
+      setIsStarting(false);
     }
-  } catch (error) {
-    showToast('Error: ' + error.message, 'error');
-  } finally {
-    setIsStarting(false);
-  }
-};
-const stopScheduler = async () => {
-  if (!confirm('Stop the auto-poster?')) return;
-  if (isStopping) return;
-  
-  setIsStopping(true);
-  showToast('🔄 Stopping auto-poster...', 'info');
-  
-  try {
-    const res = await fetch('/api/stop', { method: 'POST' });
-    const data = await res.json();
+  };
+
+  const stopScheduler = async () => {
+    if (!confirm('Stop the auto-poster?')) return;
+    if (isStopping) return;
     
-    if (data.success) {
-      showToast('⏹️ Auto-poster stopped', 'info');
-      // Force refresh status immediately
-      await fetchStatus();
-      await fetchQueue();
-      await fetchHistory();
-      // Also force a re-render
-      setStatus(prev => ({ ...prev, running: false }));
-    } else {
-      showToast('❌ ' + data.error, 'error');
+    setIsStopping(true);
+    showToast('🔄 Stopping auto-poster...', 'info');
+    
+    try {
+      const res = await fetch('/api/stop', { method: 'POST' });
+      const data = await res.json();
+      
+      if (data.success) {
+        showToast('⏹️ Auto-poster stopped', 'info');
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await fetchStatus();
+        await fetchQueue();
+        await fetchHistory();
+        setStatus(prev => ({ ...prev, running: false }));
+      } else {
+        showToast('❌ ' + data.error, 'error');
+      }
+    } catch (error) {
+      showToast('Error: ' + error.message, 'error');
+    } finally {
+      setIsStopping(false);
     }
-  } catch (error) {
-    showToast('Error: ' + error.message, 'error');
-  } finally {
-    setIsStopping(false);
-  }
-};
+  };
+
+  const triggerFetch = async () => {
+    showToast('🔄 Fetching posts...', 'info');
+    try {
+      const res = await fetch('/api/fetch', { method: 'POST' });
+      const data = await res.json();
+      showToast(data.message, data.success ? 'success' : 'error');
+      await loadData();
+    } catch (error) {
+      showToast('Error: ' + error.message, 'error');
+    }
+  };
 
   const postNow = async (postId) => {
     if (!confirm('Post this item now?')) return;
@@ -204,6 +220,35 @@ const stopScheduler = async () => {
       const data = await res.json();
       showToast(data.message, 'info');
       fetchQueue();
+    } catch (error) {
+      showToast('Error: ' + error.message, 'error');
+    }
+  };
+
+  const submitManualPost = async () => {
+    if (!manualContent && !manualImage) {
+      showToast('Please enter content or an image URL', 'error');
+      return;
+    }
+    const data = { content: manualContent };
+    if (manualImage) data.image_url = manualImage;
+
+    showToast('📤 Posting manually...', 'info');
+    try {
+      const res = await fetch('/api/manual-post', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const result = await res.json();
+      showToast(result.message, result.success ? 'success' : 'error');
+      if (result.success) {
+        showPostedNotification(`✅ Manual post published!`);
+        setShowManualPost(false);
+        setManualContent('');
+        setManualImage('');
+        await loadData();
+      }
     } catch (error) {
       showToast('Error: ' + error.message, 'error');
     }
@@ -410,7 +455,7 @@ const stopScheduler = async () => {
         </div>
       </div>
 
-      {/* Controls - Removed Manual Post and Fetch Now */}
+      {/* Controls */}
       <div className="card">
         <h2>🎮 Admin Controls</h2>
         <div className="controls-row">
@@ -428,7 +473,9 @@ const stopScheduler = async () => {
           >
             {isStopping ? '⏳ Stopping...' : '⏹️ Stop Auto'}
           </button>
+          <button className="btn btn-primary" onClick={() => setShowManualPost(true)}>✏️ Manual Post</button>
           <button className="btn btn-secondary" onClick={clearQueue}>🗑️ Clear Queue</button>
+          <button className="btn btn-info" onClick={triggerFetch}>📡 Fetch Now</button>
         </div>
       </div>
 
@@ -539,6 +586,30 @@ const stopScheduler = async () => {
             </div>
           ))
         )}
+      </div>
+
+      {/* Manual Post Modal */}
+      <div className={`modal ${showManualPost ? 'active' : ''}`}>
+        <div className="modal-content">
+          <h3>✏️ Manual Post</h3>
+          <label>Content:</label>
+          <textarea
+            value={manualContent}
+            onChange={(e) => setManualContent(e.target.value)}
+            placeholder="Enter your post content..."
+          />
+          <label>Image URL (optional):</label>
+          <input
+            type="text"
+            value={manualImage}
+            onChange={(e) => setManualImage(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+          />
+          <div className="modal-actions">
+            <button className="btn btn-secondary" onClick={() => setShowManualPost(false)}>Cancel</button>
+            <button className="btn btn-primary" onClick={submitManualPost}>📤 Post Now</button>
+          </div>
+        </div>
       </div>
 
       {/* Preview Modal */}
