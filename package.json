@@ -8,6 +8,7 @@
     "start": "next start"
   },
   "dependencies": {
+    "@vercel/blob": "^2.6.1",
     "@zernio/node": "^0.2.474",
     "axios": "^1.6.2",
     "cors": "^2.8.5",
