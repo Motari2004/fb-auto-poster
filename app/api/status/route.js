@@ -1,41 +1,44 @@
+// /api/status/route.js
 import { NextResponse } from 'next/server';
 import { autoPoster } from '../../../lib/scheduler.js';
 import { dbStateManager } from '../../../lib/db-state-manager.js';
 
 export async function GET() {
   try {
-    // 🔴 FIX: ALWAYS read from database - IGNORE memory state
-    // Database is the source of truth
+    // Get current memory state first (this is the source of truth for runtime)
+    const memoryRunning = autoPoster.running;
     
-    // Get running state from database directly
-    const dbRunning = await dbStateManager.getRunningState();
-    console.log(`📊 Status API - DB says: ${dbRunning}`);
-    
-    // 🔴 CRITICAL: Override memory state with database value
-    // This ensures the UI shows what's actually in the database
-    autoPoster.running = dbRunning;
-    await autoPoster.saveRunningState();
-    
-    // Ensure initialized
+    // If not initialized, initialize
     if (!autoPoster.initialized) {
       await autoPoster.initialize();
     }
     
-    // Get status but override running with database value
+    // Get the full status
     const status = autoPoster.getStatus();
     
-    // 🔴 FORCE the running value to be the database value
-    const finalResponse = {
+    // Use memory state as primary source, only check DB if memory is undefined
+    let finalRunning = memoryRunning;
+    
+    if (finalRunning === undefined) {
+      // Fallback to database only if memory state is undefined
+      const dbRunning = await dbStateManager.getRunningState();
+      finalRunning = dbRunning;
+      // Sync memory with DB
+      autoPoster.running = dbRunning;
+      await autoPoster.saveRunningState();
+    }
+    
+    // Return status with running state from memory
+    const response = {
       ...status,
-      running: dbRunning, // Force database value
-      _dbState: dbRunning,
-      _memoryState: autoPoster.running,
-      _source: 'Neon Database (forced)',
+      running: finalRunning,
+      _memoryState: memoryRunning,
+      _source: 'Memory State (primary)',
     };
     
-    console.log(`📊 Final Response - Running: ${finalResponse.running}`);
+    console.log(`📊 Status API - Memory says: ${memoryRunning}, Returning: ${finalRunning}`);
     
-    return NextResponse.json(finalResponse);
+    return NextResponse.json(response);
   } catch (error) {
     console.error('❌ Status error:', error);
     return NextResponse.json(
