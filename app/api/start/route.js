@@ -4,23 +4,31 @@ import { dbStateManager } from '../../../lib/db-state-manager.js';
 
 export async function POST() {
   try {
-    console.log(`📤 Start API called`);
+    console.log(`📤 Start API called on Vercel`);
     
-    // Initialize if needed
+    // 🔴 FIX: Set database FIRST, then memory
+    // This ensures the state persists across cold starts
+    
+    // 1. Set database to running
+    await dbStateManager.setRunningState(true);
+    console.log('💾 Database set to Running');
+    
+    // 2. Initialize if needed
     if (!autoPoster.initialized) {
       await autoPoster.initialize();
     }
     
-    // Set running state in database FIRST
-    await dbStateManager.setRunningState(true);
-    console.log('💾 Running state set to TRUE in Neon Database');
+    // 3. Set memory to running
+    autoPoster.running = true;
+    await autoPoster.saveRunningState();
+    console.log('💾 Memory set to Running');
     
-    // Then start the scheduler
+    // 4. Start the scheduler
     await autoPoster.start();
     
-    // Verify state
+    // 5. Verify
     const dbRunning = await dbStateManager.getRunningState();
-    console.log(`📤 After start - DB: ${dbRunning}, Scheduler: ${autoPoster.running}`);
+    console.log(`📤 After start - DB: ${dbRunning}, Memory: ${autoPoster.running}`);
     
     const status = autoPoster.getStatus();
     
@@ -28,8 +36,8 @@ export async function POST() {
       success: true, 
       message: '✅ Auto-poster started!',
       running: dbRunning,
+      memoryState: autoPoster.running,
       status: status,
-      dbState: dbRunning,
     });
   } catch (error) {
     console.error('❌ Start error:', error);

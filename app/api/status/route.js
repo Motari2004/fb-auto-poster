@@ -4,46 +4,35 @@ import { dbStateManager } from '../../../lib/db-state-manager.js';
 
 export async function GET() {
   try {
+    // 🔴 FIX: ALWAYS read from database on Vercel
+    // Database is the source of truth, not memory
+    
+    // Get running state from database
+    const dbRunning = await dbStateManager.getRunningState();
+    
+    // Sync the scheduler's memory state with database
+    if (autoPoster.running !== dbRunning) {
+      console.log(`🔄 Syncing memory (${autoPoster.running}) to DB (${dbRunning})`);
+      autoPoster.running = dbRunning;
+      await autoPoster.saveRunningState();
+    }
+    
     // Ensure initialized
     if (!autoPoster.initialized) {
       await autoPoster.initialize();
     }
     
-    // 🔴 FIX: Read from database as source of truth, but DON'T override it
-    // Only use database state if memory state is undefined or null
-    const dbRunning = await dbStateManager.getRunningState();
-    const schedulerRunning = autoPoster.running;
-    
-    // Use memory state if available, otherwise use database
-    let running;
-    if (schedulerRunning !== undefined && schedulerRunning !== null) {
-      running = schedulerRunning;
-    } else {
-      running = dbRunning;
-    }
-    
-    // 🔴 FIX: Don't sync back to database from status check
-    // Only sync if there's a mismatch and we're sure it should change
-    if (schedulerRunning !== undefined && schedulerRunning !== null && schedulerRunning !== dbRunning) {
-      console.log(`🔄 State mismatch: Memory=${schedulerRunning}, DB=${dbRunning}`);
-      // Only update database if memory state is explicitly set
-      // This prevents the status check from overriding start/stop
-      if (schedulerRunning !== false) {
-        // If memory says true, update database to true
-        await dbStateManager.setRunningState(schedulerRunning);
-        console.log(`💾 Synced DB to memory: ${schedulerRunning}`);
-      }
-      // If memory says false, don't override (keeps last user action)
-    }
-    
+    // Get status and override running with database value
     const status = autoPoster.getStatus();
+    
+    console.log(`📊 Status API - Running: ${dbRunning} (from DB)`);
     
     return NextResponse.json({
       ...status,
-      running: running,
-      _source: 'Memory',
+      running: dbRunning, // 🔴 Force database value
+      _source: 'Neon Database (Vercel)',
       _dbState: dbRunning,
-      _memoryState: schedulerRunning,
+      _memoryState: autoPoster.running,
     });
   } catch (error) {
     console.error('❌ Status error:', error);
