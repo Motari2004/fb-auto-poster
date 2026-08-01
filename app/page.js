@@ -133,31 +133,34 @@ export default function Home() {
     setIsStarting(false);
   }
 };
-  const stopScheduler = async () => {
-    if (!confirm('Stop the auto-poster?')) return;
-    if (isStopping) return;
+const stopScheduler = async () => {
+  if (!confirm('Stop the auto-poster?')) return;
+  if (isStopping) return;
+  
+  setIsStopping(true);
+  showToast('🔄 Stopping auto-poster...', 'info');
+  
+  try {
+    const res = await fetch('/api/stop', { method: 'POST' });
+    const data = await res.json();
     
-    setIsStopping(true);
-    showToast('🔄 Stopping auto-poster...', 'info');
-    
-    try {
-      const res = await fetch('/api/stop', { method: 'POST' });
-      const data = await res.json();
-      
-      if (data.success) {
-        showToast('⏹️ Auto-poster stopped', 'info');
-        await fetchStatus();
-        await fetchQueue();
-        await fetchHistory();
-      } else {
-        showToast('❌ ' + data.error, 'error');
-      }
-    } catch (error) {
-      showToast('Error: ' + error.message, 'error');
-    } finally {
-      setIsStopping(false);
+    if (data.success) {
+      showToast('⏹️ Auto-poster stopped', 'info');
+      // Force refresh status immediately
+      await fetchStatus();
+      await fetchQueue();
+      await fetchHistory();
+      // Also force a re-render
+      setStatus(prev => ({ ...prev, running: false }));
+    } else {
+      showToast('❌ ' + data.error, 'error');
     }
-  };
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  } finally {
+    setIsStopping(false);
+  }
+};
 
   const postNow = async (postId) => {
     if (!confirm('Post this item now?')) return;
