@@ -1,0 +1,27 @@
+{
+  "name": "facebook-auto-poster-nextjs",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@zernio/node": "^0.2.474",
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "form-data": "^4.0.6",
+    "fs-extra": "^11.2.0",
+    "moment-timezone": "^0.5.43",
+    "next": "14.0.4",
+    "node-cron": "^3.0.2",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "@types/react": "^18.2.45",
+    "typescript": "^5.3.3"
+  }
+}
