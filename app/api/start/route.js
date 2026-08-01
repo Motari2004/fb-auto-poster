@@ -5,12 +5,12 @@ export async function POST() {
   try {
     console.log(`📤 Start API called - Current running: ${autoPoster.running}`);
     
-    // Only initialize if not already initialized
+    // Initialize if needed
     if (!autoPoster.initialized) {
       await autoPoster.initialize();
     }
     
-    // Start the scheduler - this sets running = true
+    // Start the scheduler (this now requires manual control)
     await autoPoster.start();
     
     console.log(`📤 After start - New running: ${autoPoster.running}`);

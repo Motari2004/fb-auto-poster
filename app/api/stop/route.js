@@ -5,7 +5,7 @@ export async function POST() {
   try {
     console.log(`📤 Stop API called - Current running: ${autoPoster.running}`);
     
-    // Stop the scheduler - this sets running = false
+    // Stop the scheduler (this now requires manual control)
     await autoPoster.stop();
     
     console.log(`📤 After stop - New running: ${autoPoster.running}`);
